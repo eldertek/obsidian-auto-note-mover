@@ -23,16 +23,17 @@ export default class AutoNoteMover extends Plugin {
 
 			// Excluded Folder check
 			const excludedFolderLength = excludedFolder.length;
+			const parentPath = file.parent ? normalizePath(file.parent.path) : '';
 			for (let i = 0; i < excludedFolderLength; i++) {
 				if (
 					!this.settings.use_regex_to_check_for_excluded_folder &&
 					excludedFolder[i].folder &&
-					file.parent.path === normalizePath(excludedFolder[i].folder)
+					parentPath === normalizePath(excludedFolder[i].folder)
 				) {
 					return;
 				} else if (this.settings.use_regex_to_check_for_excluded_folder && excludedFolder[i].folder) {
 					const regex = new RegExp(excludedFolder[i].folder);
-					if (regex.test(file.parent.path)) {
+					if (regex.test(parentPath)) {
 						return;
 					}
 				}
@@ -47,7 +48,7 @@ export default class AutoNoteMover extends Plugin {
 			const fileName = file.basename;
 			const fileFullName = file.basename + '.' + file.extension;
 			const settingsLength = folderTagPattern.length;
-			const cacheTag = getAllTags(fileCache);
+			const cacheTag = getAllTags(fileCache) || [];
 
 			// checker
 			for (let i = 0; i < settingsLength; i++) {
@@ -81,9 +82,9 @@ export default class AutoNoteMover extends Plugin {
 		};
 
 		// Show trigger indicator on status bar
-		let triggerIndicator: HTMLElement;
+		let triggerIndicator: HTMLElement | null = null;
 		const setIndicator = () => {
-			if (!this.settings.statusBar_trigger_indicator) return;
+			if (!this.settings.statusBar_trigger_indicator || !triggerIndicator) return;
 			triggerIndicator.setText(getTriggerIndicator(this.settings.trigger_auto_manual));
 		};
 		if (this.settings.statusBar_trigger_indicator) {
@@ -100,12 +101,27 @@ export default class AutoNoteMover extends Plugin {
 		});
 
 		const moveNoteCommand = (view: MarkdownView) => {
+			if (!view || !view.file) return;
 			if (isFmDisable(this.app.metadataCache.getFileCache(view.file))) {
 				new Notice('Auto Note Mover is disabled in the frontmatter.');
 				return;
 			}
 			fileCheck(view.file, undefined, 'cmd');
 		};
+
+		this.addCommand({
+			id: 'Move-all-notes',
+			name: 'Move all notes',
+			callback: () => {
+				const files = this.app.vault.getMarkdownFiles();
+				let count = 0;
+				for (const f of files) {
+					fileCheck(f, undefined, 'cmd');
+					count++;
+				}
+				new Notice(`[Auto Note Mover]\nChecked ${count} notes.`);
+			},
+		});
 
 		this.addCommand({
 			id: 'Move-the-note',
